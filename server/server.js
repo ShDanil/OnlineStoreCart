@@ -5,10 +5,30 @@ import bodyParser from 'body-parser'
 import sockjs from 'sockjs'
 import { renderToStaticNodeStream } from 'react-dom/server'
 import React from 'react'
-
+import axios from 'axios'
 import cookieParser from 'cookie-parser'
 import config from './config'
 import Html from '../client/html'
+
+const { readFile, writeFile, unlink } = require('fs').promises
+
+const data = require('../client/data')
+
+//  readFile, writeFile, unlink
+
+const saveFile = async (users) => {
+  return writeFile(`${__dirname}/logs.json`, JSON.stringify(users), { encoding: 'utf8' })
+}
+
+const fileRead = async () => {
+  return readFile(`${__dirname}/logs.json`, { encoding: 'utf8' })
+    .then((logs) => JSON.parse(logs))
+    .catch(async () => {
+      const array = []
+      await saveFile(array)
+      return array
+    })
+}
 
 const Root = () => ''
 
@@ -40,6 +60,34 @@ const middleware = [
 ]
 
 middleware.forEach((it) => server.use(it))
+
+server.get('/api/v1/logs', async (req, res) => {
+  const users = await fileRead()
+  res.json(users)
+})
+
+server.post('/api/v1/logs', async (req, res) => {
+  console.log(req.body)
+  const logs = await fileRead()
+  const newLogsBody = req.body
+  const newLogs = [...logs, newLogsBody]
+  saveFile(newLogs)
+  res.json(req.body)
+})
+
+server.delete('/api/v1/logs', async (req, res) => {
+  unlink(`${__dirname}/logs.json`)
+  res.json()
+})
+
+server.get('/api/v1/products', (req, res) => {
+  res.json(data.slice(0, 10))
+})
+
+server.get('/api/v1/rates', async (req, res) => {
+  const { data: rates } = await axios('https://api.exchangeratesapi.io/latest?symbols=USD,CAD')
+  res.json(rates)
+})
 
 server.use('/api/', (req, res) => {
   res.status(404)
